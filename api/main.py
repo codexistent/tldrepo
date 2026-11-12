@@ -3,8 +3,14 @@ import os
 import httpx
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI 
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+
+from github import parse_repo_url, get_snapshot
+
+from dotenv import load_dotenv
+
+load_dotenv()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -22,7 +28,7 @@ async def lifespan(app: FastAPI):
 
     await app.state.github.aclose()
 
-app = FastAPI()
+app = FastAPI(lifespan=lifespan)
 
 # CORS middleware
 
@@ -44,3 +50,18 @@ app.add_middleware(
 @app.get("/api/health")
 def health():
     return {"status": "true"}
+
+@app.get("/api/debug/ss")
+async def debug_ss(url: str, request: Request):
+    try:
+        owner, repo = parse_repo_url(url)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error))
+
+    snapshot = await get_snapshot(request.app.state.github, owner, repo)
+
+    return {
+        "sha": snapshot.sha,
+        "file_count": len(snapshot.files),
+        "truncated": snapshot.truncated
+    }

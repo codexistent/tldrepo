@@ -52,7 +52,8 @@ tldrepo
 
 To run it all up, we ran:
 
-- `cd api`, `pip install -r requirements.txt`
+- `cd api`, `pip install -r requirements.txt` (for mac it's `pip3`)
+  - if the wheel errors do `pip install -r requirements.txt --only-binary cryptography`
 - started frontend in new terminal: `cd web`, `npm run dev`
 - started backend in new terminal: `cd api`, `uvicorn main:app --reload`
 
