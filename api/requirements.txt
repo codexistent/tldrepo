@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+httpx
+google-genai
+sqlmodel
+psycopg[binary]
+supabase
+python-dotenv
