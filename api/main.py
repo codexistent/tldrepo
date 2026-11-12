@@ -7,7 +7,8 @@ app = FastAPI()
 
 ## frontend URLs allowed to read responses (no trailing slashes)
 FRONTEND_ORIGINS = [
-    "http://localhost:5173"
+    "http://localhost:5173",
+    "https://tldrepo.vercel.app"
 ]
 
 ## add middleware

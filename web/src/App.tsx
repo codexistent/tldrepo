@@ -1,11 +1,18 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
+import { useState, useEffect } from "react";
+import heroImg from "./assets/hero.png";
+import reactLogo from "./assets/react.svg";
+import viteLogo from "./assets/vite.svg";
+import "./App.css";
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    fetch(`${import.meta.env.VITE_API_URL}/api/health`)
+      .then((res) => res.json())
+      .then((data) => console.log("Health status:", data))
+      .catch((err) => console.error("Health check failed:", err));
+  }, []);
 
   return (
     <>
@@ -116,7 +123,7 @@ function App() {
       <div className="ticks"></div>
       <section id="spacer"></section>
     </>
-  )
+  );
 }
 
-export default App
+export default App;
