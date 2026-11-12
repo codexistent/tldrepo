@@ -1,22 +1,27 @@
-from pydantic import BaseModel, ConfigDict, Field
+from typing import Literal, Annotated
+
+from pydantic import BaseModel, ConfigDict, TypeAdapter, Field
 from pydantic.alias_generators import to_camel
 
 class CamelModel(BaseModel):
     model_config=ConfigDict(alias_generator=to_camel, populate_by_name=True) # # snake case to camel case
 
-class Meta(CamelModel):
+class RepoMeta(CamelModel):
+    type: Literal["meta"] = "meta"
     owner: str
     repo: str
     sha: str 
     cached: bool
 
-class Overview(CamelModel):
+class RepoOverview(CamelModel):
+    type: Literal["overview"] = "overview"
     summary: str 
     stack: list[str] = Field(max_length = 6)
     entry_point: str 
 
 # a stop along the tour to explore a specific file; cld be better named lol
-class Stop(CamelModel):
+class TourStopEvent(CamelModel):
+    type: Literal["stop"] = "stop"
     index: int 
     title: str = Field(max_length = 60)
     path: str
@@ -25,9 +30,17 @@ class Stop(CamelModel):
     explanation: str = Field(max_length = 250)
     why_it_matters: str = Field(max_length = 125)
 
-class Done(CamelModel):
+class TourDoneEvent(CamelModel):
+    type: Literal["done"] = "done"
     stop_count: int 
     ms: int
 
-class Error(CamelModel):
+class TourErrorEvent(CamelModel):
+    type: Literal["error"] = "error"
     message: str
+
+TourEvent = Annotated[
+    RepoMeta | RepoOverview | TourStopEvent | TourDoneEvent | TourErrorEvent,
+    Field(discriminator = "type")
+]
+tour_event_adapter = TypeAdapter(TourEvent)

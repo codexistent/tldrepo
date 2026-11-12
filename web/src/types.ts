@@ -3,21 +3,21 @@
  */
 
 // metadata on repo
-export type Meta = {
+export type RepoMeta = {
   owner: string;
   repo: string;
   sha: string;
   cached: boolean;
 };
 
-export type Overview = {
+export type RepoOverview = {
   summary: string;
   stack: string[];
   entryPoint: string;
 };
 
 // a stop along the tour to explore a specific file; cld be better named lol
-export type Stop = {
+export type TourStopEvent = {
   index: number;
   title: string;
   path: string;
@@ -28,12 +28,12 @@ export type Stop = {
 };
 
 // event for when stream is complete
-export type Done = {
+export type TourDoneEvent = {
   stopCount: number;
   ms: number;
 };
 
 // event for when there is error
-export type Error = {
+export type TourErrorEvent = {
   message: string;
 };
