@@ -63,3 +63,18 @@ We're now up and running! The API health check worked so we'll next deploy our a
 The next step we took before writing logic was creating the types and API contracts our app would use. We did this first so frontend and backend can't disagree later down the line, and such that any mismatch shows up as a type or validation error instead of a blank screen.
 
 We mapped out all types/API contracts in `CONTRACTS.md`. Now we'll implement them in the `contracts` branch.
+
+To validate our changes were working, in `/api` we ran:
+
+```
+>>> from schemas import tour_event_adapter
+>>> tour_event_adapter.validate_json('{"type": "stop", "index": 1, "title": "App entry point", "path": "src/main.py", "startLine": 1, "endLine": 20, "explanation": "Creates the app.", "whyItMatters": "Everything starts here."}')
+```
+
+and this returned:
+
+```
+TourStopEvent(type='stop', index=1, title='App entry point', path='src/main.py', start_line=1, end_line=20, explanation='Creates the app.', why_it_matters='Everything starts here.')
+```
+
+with camel case, so our pydantic adapter is working.
