@@ -1,5 +1,26 @@
+import os
+
+import httpx
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI 
 from fastapi.middleware.cors import CORSMiddleware
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # runs once at startup
+
+    if(os.getenv("GITHUB_TOKEN") is None):
+        raise RuntimeError("GITHUB_TOKEN not set.")
+
+    token = os.getenv("GITHUB_TOKEN")
+
+    app.state.github = httpx.AsyncClient(base_url="https://api.github.com", headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"}, timeout=10)
+
+    yield 
+    # runs once at shutdown
+
+    await app.state.github.aclose()
 
 app = FastAPI()
 

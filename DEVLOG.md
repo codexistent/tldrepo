@@ -78,3 +78,14 @@ TourStopEvent(type='stop', index=1, title='App entry point', path='src/main.py',
 ```
 
 with camel case, so our pydantic adapter is working.
+
+# GitHub API
+
+In `fetch-gh` branch we implemented the code for fetching and processing the data collected via GitHub API.
+
+Using the public `pallets/flask` repo as mock data, we mapped out which fields we'd need:
+
+- `default_branch` from `https://api.github.com/repos/pallets/flask`
+- top level `sha` from `https://api.github.com/repos/pallets/flask/commits/main`
+- `tree` array in `https://api.github.com/repos/pallets/flask/git/trees/%3Cthat%20sha%3E?recursive=1`
+- `https://raw.githubusercontent.com/pallets/flask/%3Csha%3E/README.md`
