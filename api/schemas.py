@@ -16,19 +16,19 @@ class RepoMeta(CamelModel):
 class RepoOverview(CamelModel):
     type: Literal["overview"] = "overview"
     summary: str 
-    stack: list[str] = Field(max_length = 6)
+    stack: list[str] # = Field(max_length = 6)
     entry_point: str 
 
 # a stop along the tour to explore a specific file; cld be better named lol
 class TourStopEvent(CamelModel):
     type: Literal["stop"] = "stop"
-    index: int 
-    title: str = Field(max_length = 60)
+    index: int = Field(ge=1)
+    title: str # = Field(max_length = 60)
     path: str
-    start_line: int 
-    end_line: int 
-    explanation: str = Field(max_length = 250)
-    why_it_matters: str = Field(max_length = 125)
+    start_line: int = Field(ge=1)
+    end_line: int = Field(ge=1)
+    explanation: str # = Field(max_length = 250)
+    why_it_matters: str # = Field(max_length = 125)
 
 class TourDoneEvent(CamelModel):
     type: Literal["done"] = "done"
@@ -38,6 +38,9 @@ class TourDoneEvent(CamelModel):
 class TourErrorEvent(CamelModel):
     type: Literal["error"] = "error"
     message: str
+
+class TourRequest(CamelModel):
+    request_url: str
 
 TourEvent = Annotated[
     RepoMeta | RepoOverview | TourStopEvent | TourDoneEvent | TourErrorEvent,
