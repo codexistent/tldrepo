@@ -158,18 +158,20 @@ def to_lines(text: str) -> list[str] | None :
             break
         kept.append(line)
 
-    return kept, chars
+    return kept
 
 # download one file
 async def fetch_file(client: httpx.AsyncClient, semaphore: Semaphore, owner: str, repo: str, sha: str, path: str) -> FileContent | None:
-    url = f"https://raw.githubusercontent.com/{owner}/{repo}/{sha}/{quote(path, safe="/")}"
+    url = f"https://raw.githubusercontent.com/{owner}/{repo}/{sha}/{quote(path, safe='/')}"
 
     # use semaphore to restrict total concurrent calls at any point in time
     async with semaphore:
         try:
             response = await client.get(url) # build full url since 
         except httpx.RequestError:
-            raise HTTPException(status_code=502, detail="GitHub error") 
+            # return None instead of raising exception so one bad fetch doesnt kill the entire request
+            return None
+            # raise HTTPException(status_code=502, detail="GitHub error") 
 
         # invalid status code
         if response.status_code != 200:
@@ -250,7 +252,7 @@ def pick_key_files(files: list[RepoFile]) -> list[RepoFile]:
 
     return picked_files
 
-async def fetch_files(client: httpx.AsyncClient, snapshot: Snapshot, picked: list[RepoFile]) -> list[RepoFile]:
+async def fetch_files(client: httpx.AsyncClient, snapshot: Snapshot, picked: list[RepoFile]) -> list[FileContent]:
     # cap at 8 simultaneous gh calls
     sem = asyncio.Semaphore(8)
 
@@ -260,6 +262,6 @@ async def fetch_files(client: httpx.AsyncClient, snapshot: Snapshot, picked: lis
         coroutines.append(fetch_file(client, sem, snapshot.owner, snapshot.repo, snapshot.sha, file.path))
 
     files = await asyncio.gather(*coroutines)
-    files = (file for file in files if file != None)
+    files = [file for file in files if file is not None]
 
     return files
