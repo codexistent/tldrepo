@@ -1,4 +1,5 @@
 import os
+import time
 
 import httpx
 from contextlib import asynccontextmanager
@@ -6,7 +7,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from github import parse_repo_url, get_snapshot, pick_key_files
+from github import parse_repo_url, get_snapshot, pick_key_files, fetch_files
 
 from dotenv import load_dotenv
 
@@ -53,6 +54,8 @@ def health():
 
 @app.get("/api/debug/ss")
 async def debug_ss(url: str, request: Request):
+    start_time = time.perf_counter() # testing
+
     try:
         owner, repo = parse_repo_url(url)
     except ValueError as error:
@@ -62,4 +65,10 @@ async def debug_ss(url: str, request: Request):
 
     picked_files = pick_key_files(snapshot.files)
 
-    return picked_files
+    files = await fetch_files(request.app.state.github, snapshot, picked_files)
+
+    elapsed_time = time.perf_counter() - start_time # testing
+    print("SUCCESSFULLY FETCHED FILES.") # testing
+    print("TIME TAKEN TO FETCH ALL FILES: ", elapsed_time) # testing
+
+    return files

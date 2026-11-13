@@ -2,11 +2,14 @@ import re # regex
 import httpx
 import logging
 
+import asyncio
+from asyncio import Semaphore
+
 from fastapi import HTTPException
 
 from dataclasses import dataclass
 
-from asyncio import Semaphore
+from urllib.parse import quote
 
 logging.basicConfig(
     level = logging.DEBUG
@@ -48,6 +51,11 @@ TEST_DIRS = ('test', 'tests', '__tests__', 'spec')
 DOC_DIRS = ('docs', 'doc', 'examples')
 MAX_FILES = 15
 MAX_SIZE = 100_000
+
+# constants used in to_lines 
+MAX_LINES = 250 
+MAX_CHARS = 12_000 
+MAX_LINE_LEN = 1_000
 
 # HELPERS
 #
@@ -136,12 +144,42 @@ def is_candidate(path, size) -> int | None:
 
     return None
 
+# convert text to individual lines
+def to_lines(text: str) -> list[str] | None : 
+    lines = text.replace("\r\n", "\n").replace("\r", "\n").removesuffix("\n").split("\n")
+
+    if(any(len(line) > MAX_LINE_LEN for line in lines)):
+        return None # minified or generated file 
+
+    kept, chars = [], 0
+    for line in lines[:MAX_LINES]:
+        chars += len(line) + 1
+        if(chars > MAX_CHARS):
+            break
+        kept.append(line)
+
+    return kept, chars
+
 # download one file
 async def fetch_file(client: httpx.AsyncClient, semaphore: Semaphore, owner: str, repo: str, sha: str, path: str) -> FileContent | None:
-    try:
-        response = await client.get(f"https://raw.githubusercontent.com/{owner}/{repo}/{sha}/{path}") # build full url since 
-    except httpx.RequestError:
-        raise HTTPException(status_code=502, detail="GitHub error") 
+    url = f"https://raw.githubusercontent.com/{owner}/{repo}/{sha}/{quote(path, safe="/")}"
+
+    # use semaphore to restrict total concurrent calls at any point in time
+    async with semaphore:
+        try:
+            response = await client.get(url) # build full url since 
+        except httpx.RequestError:
+            raise HTTPException(status_code=502, detail="GitHub error") 
+
+        # invalid status code
+        if response.status_code != 200:
+            return None 
+
+        # binary file returned
+        if '\x00' in response.text:
+            return None
+
+        return FileContent(path, to_lines(response.text))
 
 # FUNCTIONS
 #
@@ -211,3 +249,17 @@ def pick_key_files(files: list[RepoFile]) -> list[RepoFile]:
     logging.info(candidate_files)
 
     return picked_files
+
+async def fetch_files(client: httpx.AsyncClient, snapshot: Snapshot, picked: list[RepoFile]) -> list[RepoFile]:
+    # cap at 8 simultaneous gh calls
+    sem = asyncio.Semaphore(8)
+
+    coroutines = []
+
+    for file in picked:
+        coroutines.append(fetch_file(client, sem, snapshot.owner, snapshot.repo, snapshot.sha, file.path))
+
+    files = await asyncio.gather(*coroutines)
+    files = (file for file in files if file != None)
+
+    return files

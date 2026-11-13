@@ -42,3 +42,10 @@ export type TourErrorEvent = {
   type: "error";
   message: string;
 };
+
+export type TourEvent =
+  | RepoMeta
+  | RepoOverview
+  | TourStopEvent
+  | TourDoneEvent
+  | TourErrorEvent;
