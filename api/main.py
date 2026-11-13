@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from github import parse_repo_url, get_snapshot
+from github import parse_repo_url, get_snapshot, pick_key_files
 
 from dotenv import load_dotenv
 
@@ -60,8 +60,6 @@ async def debug_ss(url: str, request: Request):
 
     snapshot = await get_snapshot(request.app.state.github, owner, repo)
 
-    return {
-        "sha": snapshot.sha,
-        "file_count": len(snapshot.files),
-        "truncated": snapshot.truncated
-    }
+    picked_files = pick_key_files(snapshot.files)
+
+    return picked_files

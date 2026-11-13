@@ -90,3 +90,15 @@ Using the public `pallets/flask` repo as mock data, we mapped out which fields w
 - top level `sha` from `https://api.github.com/repos/pallets/flask/commits/main`
 - `tree` array in `https://api.github.com/repos/pallets/flask/git/trees/%3Cthat%20sha%3E?recursive=1`
 - `https://raw.githubusercontent.com/pallets/flask/%3Csha%3E/README.md`
+
+## `pick_key_files`
+
+One of the most algorithm/consideration-heavy parts of our application is in how we choose to pick which files to display or take into account as being key on the tour.
+
+As of our current implementation, we use a deterministic algorithm which cycles through a repo's files and assigns point scores based on attributes of a file. For instance:
+- if `README` at root, +100
+- if file name in `MANIFESTS` (a constant list), +80
+- lower depths receive +20; higher depths +10
+and so on.
+
+In the future we can use a more flexible non-deterministic algorithm, such as by plugging in an AI API, but without good architecture work this would only slow our app so we will go with deterministic for now.

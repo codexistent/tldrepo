@@ -1,9 +1,16 @@
 import re # regex
 import httpx
+import logging
 
 from fastapi import HTTPException
 
 from dataclasses import dataclass
+
+from asyncio import Semaphore
+
+logging.basicConfig(
+    level = logging.DEBUG
+)
 
 # DATACLASSES
 #
@@ -21,6 +28,11 @@ class Snapshot:
     files: list[RepoFile]
     truncated: bool
 
+@dataclass 
+class FileContent:
+    path: str
+    lines: list[str]
+
 # CONSTANTS
 #
 
@@ -37,67 +49,21 @@ DOC_DIRS = ('docs', 'doc', 'examples')
 MAX_FILES = 15
 MAX_SIZE = 100_000
 
-# FUNCTIONS
-#
-
-# parses pasted repo url for owner and repo name
-def parse_repo_url(url: str) -> tuple[str, str]:
-    url = url.strip()
-
-    for prefix in ("https://", "http://", "www.", "github.com"):
-        url = url.removeprefix(prefix)
-
-    parts = [part for part in url.split("/") if part != ""]
-
-    if(len(parts) < 2):
-        raise ValueError("Invalid url: incorrect number of parsed parts")
-
-    owner = parts[0]
-    repo = parts[1].removesuffix(".git")
-
-    # regex check
-    for name in (owner, repo):
-        if(not NAME_REGEX.fullmatch(name) or name in {".", "..", "..."}):
-            raise ValueError(f"Invalid url: {name} is not valid")
-
-    return owner, repo
-
-# get snapshot of data 
-async def get_snapshot(client: httpx.AsyncClient, owner: str, repo: str) -> Snapshot:
-    # three api calls in a sequence: branch, SHA, tree
-    
-    # get default branch 
-    response = await github_get(client, f"/repos/{owner}/{repo}")
-    default_branch = response["default_branch"]
-
-    # get SHA so we always get repo at same version/time 
-    response = await github_get(client, f"/repos/{owner}/{repo}/commits/{default_branch}")
-    repo_sha = response["sha"]
-
-    # get file structure of repo
-    tree = await github_get(client, f"/repos/{owner}/{repo}/git/trees/{repo_sha}", params={"recursive": "1"})
-
-    files = [RepoFile(path=entry["path"], size=entry.get("size", 0)) for entry in tree["tree"] if entry["type"] == "blob"]
-
-    return Snapshot(
-        owner = owner,
-        repo = repo,
-        sha = repo_sha, 
-        files = files, 
-        truncated = tree.get("truncated", False)
-    )
-
 # HELPERS
 #
 
 # get json dict of github api link
 async def github_get(client: httpx.AsyncClient, path: str, params: dict | None = None) -> dict :
-    response = await client.get(path, params=params)
+    try:
+        response = await client.get(path, params=params)
+    except httpx.RequestError:
+        raise HTTPException(status_code=502, detail="GitHub error")
 
     if response.status_code == 404:
         raise HTTPException(status_code=404, detail="Repo not found or private")
-
-    if response.status_code != 200:
+    elif response.status_code in (403, 429):
+        raise HTTPException(status_code=response.status_code, detail="GitHub rate limit, try again in a min")
+    elif response.status_code != 200:
         raise HTTPException(status_code=502, detail="GitHub error")
 
     return response.json()
@@ -170,7 +136,66 @@ def is_candidate(path, size) -> int | None:
 
     return None
 
+# download one file
+async def fetch_file(client: httpx.AsyncClient, semaphore: Semaphore, owner: str, repo: str, sha: str, path: str) -> FileContent | None:
+    try:
+        response = await client.get(f"https://raw.githubusercontent.com/{owner}/{repo}/{sha}/{path}") # build full url since 
+    except httpx.RequestError:
+        raise HTTPException(status_code=502, detail="GitHub error") 
+
+# FUNCTIONS
+#
+
+# parses pasted repo url for owner and repo name
+def parse_repo_url(url: str) -> tuple[str, str]:
+    url = url.strip()
+
+    for prefix in ("https://", "http://", "www.", "github.com"):
+        url = url.removeprefix(prefix)
+
+    parts = [part for part in url.split("/") if part != ""]
+
+    if(len(parts) < 2):
+        raise ValueError("Invalid url: incorrect number of parsed parts")
+
+    owner = parts[0]
+    repo = parts[1].removesuffix(".git")
+
+    # regex check
+    for name in (owner, repo):
+        if(not NAME_REGEX.fullmatch(name) or name in {".", "..", "..."}):
+            raise ValueError(f"Invalid url: {name} is not valid")
+
+    return owner, repo
+
+# get snapshot of data 
+async def get_snapshot(client: httpx.AsyncClient, owner: str, repo: str) -> Snapshot:
+    # three api calls in a sequence: branch, SHA, tree
+    
+    # get default branch 
+    response = await github_get(client, f"/repos/{owner}/{repo}")
+    default_branch = response["default_branch"]
+
+    # get SHA so we always get repo at same version/time 
+    response = await github_get(client, f"/repos/{owner}/{repo}/commits/{default_branch}")
+    repo_sha = response["sha"]
+
+    # get file structure of repo
+    tree = await github_get(client, f"/repos/{owner}/{repo}/git/trees/{repo_sha}", params={"recursive": "1"})
+
+    files = [RepoFile(path=entry["path"], size=entry.get("size", 0)) for entry in tree["tree"] if entry["type"] == "blob"]
+
+    return Snapshot(
+        owner = owner,
+        repo = repo,
+        sha = repo_sha, 
+        files = files, 
+        truncated = tree.get("truncated", False)
+    )
+
 # selects files to consider for tour
+#   for testing: pick_key_files([RepoFile('README.md', 20), RepoFile('pyproject.toml', 500), RepoFile('src/flask/app.py', 30), RepoFile('src/flask/helpers.py', 40), RepoFile('tests/test_app.py', 20), RepoFile('docs/conf.py', 30), RepoFile('node_modules/x/index.js', 40), RepoFile('logo.png', 20), RepoFile('.gitignore', 500)])
+
 def pick_key_files(files: list[RepoFile]) -> list[RepoFile]:
     candidate_files = []
 
@@ -183,8 +208,6 @@ def pick_key_files(files: list[RepoFile]) -> list[RepoFile]:
 
     picked_files = [RepoFile(i[0].path, i[0].size) for i in candidate_files]
 
-    print(candidate_files)
+    logging.info(candidate_files)
 
     return picked_files
-
-# for testing: pick_key_files([RepoFile('README.md', 20), RepoFile('pyproject.toml', 500), RepoFile('src/flask/app.py', 30), RepoFile('src/flask/helpers.py', 40), RepoFile('tests/test_app.py', 20), RepoFile('docs/conf.py', 30), RepoFile('node_modules/x/index.js', 40), RepoFile('logo.png', 20), RepoFile('.gitignore', 500)])
