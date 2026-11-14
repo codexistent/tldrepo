@@ -181,7 +181,12 @@ async def fetch_file(client: httpx.AsyncClient, semaphore: Semaphore, owner: str
         if '\x00' in response.text:
             return None
 
-        return FileContent(path, to_lines(response.text))
+        lines = to_lines(response.text)
+
+        if(lines == None):
+            return None
+
+        return FileContent(path, lines)
 
 # FUNCTIONS
 #

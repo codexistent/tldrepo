@@ -48,7 +48,7 @@ tldrepo
         |___ .venv
 ```
 
-# First Run
+## First Run
 
 To run it all up, we ran:
 
@@ -59,7 +59,7 @@ To run it all up, we ran:
 
 We're now up and running! The API health check worked so we'll next deploy our app.
 
-# Contracts
+## Contracts
 
 The next step we took before writing logic was creating the types and API contracts our app would use. We did this first so frontend and backend can't disagree later down the line, and such that any mismatch shows up as a type or validation error instead of a blank screen.
 
@@ -80,7 +80,7 @@ TourStopEvent(type='stop', index=1, title='App entry point', path='src/main.py',
 
 with camel case, so our pydantic adapter is working.
 
-# GitHub API
+## GitHub API
 
 In `fetch-gh` branch we implemented the code for fetching and processing the data collected via GitHub API.
 
@@ -115,3 +115,49 @@ Specifically, the workflow went as follows:
 - Call `asyncio.gather(*coroutines)` to run all the queued coroutines concurrently, returning the list of results in the same order they were established in
 - In `fetch_file`, all queries to github required reserving a semaphore first, so only 8 simultaneous requests can be sent to github at once
   - A semaphore is an object which helps control how many threads can access a shared resource at the same time. Only a certain number of reservations can be made on a semaphore before some must be released first for others to reserve it (think of it as a room with a fixed number of chairs, so only that no. of ppl can sit in them at any time)
+
+# 11/13/2026
+
+After wrapping up work with the GitHub API yesterday, we now move on to wiring our front and back ends so that they receive streamed data.
+
+The mental model is that we write a generator which yields pieces of the full output as they come in, and FastAPI sends each piece to frontend the moment it's yielded. We'll use NDJSON instead of JSON for this.
+
+## Streaming - backend
+
+We started out by building a mock/testing function, `fake_tour_events`, plugged in some AI-generated mock data:
+
+```json
+events: list[CamelModel] = [
+    RepoMeta(owner="pallets", repo="flask", sha="fake-sha", cached=False),
+    RepoOverview(
+        summary="Flask is a lightweight web framework for Python.",
+        stack=["Python", "Werkzeug", "Jinja"],
+        entry_point="src/flask/app.py",
+    ),
+    TourStopEvent(
+        index=1,
+        title="The application object",
+        path="src/flask/app.py",
+        start_line=1,
+        end_line=40,
+        explanation="Defines the Flask class that every app is built on.",
+        why_it_matters="Everything else plugs into this object.",
+    ),
+    TourStopEvent(
+        index=2,
+        title="Routing helpers",
+        path="src/flask/helpers.py",
+        start_line=10,
+        end_line=30,
+        explanation="Utility functions used across request handling.",
+        why_it_matters="You'll see these called from almost every route.",
+    ),
+    TourDoneEvent(stop_count=2, ms=2000),
+]
+```
+
+and tested by executing
+
+```
+curl.exe -N -X POST http://localhost:8000/api/tours -H "Content-Type: application/json" -d "@body.json"
+```
