@@ -12,7 +12,7 @@ from github import parse_repo_url, get_snapshot, pick_key_files, fetch_files
 
 from schemas import TourRequest
 
-from tour import fake_tour_events
+from tour import tour_events, build_prompt
 
 from dotenv import load_dotenv
 
@@ -57,6 +57,29 @@ app.add_middleware(
 def health():
     return {"status": "true"}
 
+@app.post("/api/tours")
+async def create_tour(body: TourRequest, request: Request):
+    """ handles pre-streaming work """
+
+    start_time = time.perf_counter()
+
+    try:
+        owner, repo = parse_repo_url(body.request_url)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error))
+    snapshot = await get_snapshot(request.app.state.github, owner, repo)
+
+    picked_files = pick_key_files(snapshot.files)
+    files = await fetch_files(request.app.state.github, snapshot, picked_files)
+    if(len(files) == 0):
+        raise HTTPException(status_code=400, detail="No readable source files in repo")
+    
+    elapsed_time = round((time.perf_counter() - start_time)*1000)
+    
+    return StreamingResponse(tour_events(snapshot, files, elapsed_time), media_type="application/x-ndjson")
+
+# DEBUG ROUTES
+
 @app.get("/api/debug/ss")
 async def debug_ss(url: str, request: Request):
     start_time = time.perf_counter() # testing
@@ -78,23 +101,24 @@ async def debug_ss(url: str, request: Request):
 
     return files
 
-@app.post("/api/tours")
-async def create_tour(body: TourRequest, request: Request):
-    """ handles pre-streaming work """
-
+# test building prompt
+@app.get("/api/debug/bp")
+async def debug_build_prompt(url: str, request: Request):
     start_time = time.perf_counter()
 
     try:
-        owner, repo = parse_repo_url(body.request_url)
+        owner, repo = parse_repo_url(url)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error))
+
     snapshot = await get_snapshot(request.app.state.github, owner, repo)
 
     picked_files = pick_key_files(snapshot.files)
+
     files = await fetch_files(request.app.state.github, snapshot, picked_files)
-    if(len(files) == 0):
-        raise HTTPException(status_code=400, detail="No readable source files in repo")
-    
-    elapsed_time = round((time.perf_counter() - start_time)*1000)
-    
-    return StreamingResponse(fake_tour_events(snapshot, files, elapsed_time), media_type="application/x-ndjson")
+
+    prompt = build_prompt(snapshot=snapshot, files=files)
+
+    print("LEN OF PROMPT:", len(prompt))
+    print("PROMPT: ", prompt[:2000])
+    return

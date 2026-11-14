@@ -124,6 +124,8 @@ The mental model is that we write a generator which yields pieces of the full ou
 
 ## Streaming - backend
 
+### Streaming data w/ `yield` and `AsyncGenerator`
+
 We started out by building a mock/testing function, `fake_tour_events`, plugged in some AI-generated mock data:
 
 ```json
@@ -161,3 +163,11 @@ and tested by executing
 ```
 curl.exe -N -X POST http://localhost:8000/api/tours -H "Content-Type: application/json" -d "@body.json"
 ```
+
+### Building the prompt
+
+Since we only ever send one prompt to Gemini per repo, building the prompt we send to it is a big deal for our app.
+
+The function `build_prompt` builds the prompt in `tour.py`. It builds off of `format_tree` and `format_file`, which build out the string listing all the paths of a repo and a file of a repo (with numbered lines) respectively. Then `build_prompt` pieces together the full string; for this function's main string (the list `sections` which then gets strung together), we used AI to help refine our prompt.
+
+We added a debugging route `/debug/bp` to test that the prompt building was working.
