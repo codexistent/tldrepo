@@ -128,7 +128,7 @@ We started out by building a mock/testing function, `fake_tour_events`, plugged 
 
 ```json
 events: list[CamelModel] = [
-    RepoMeta(owner="pallets", repo="flask", sha="fake-sha", cached=False),
+    FileMeta(owner="pallets", repo="flask", sha="fake-sha", cached=False),
     RepoOverview(
         summary="Flask is a lightweight web framework for Python.",
         stack=["Python", "Werkzeug", "Jinja"],

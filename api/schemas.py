@@ -6,12 +6,12 @@ from pydantic.alias_generators import to_camel
 class CamelModel(BaseModel):
     model_config=ConfigDict(alias_generator=to_camel, populate_by_name=True) # # snake case to camel case
 
-class RepoMeta(CamelModel):
+class FileMeta(CamelModel):
     type: Literal["meta"] = "meta"
     owner: str
     repo: str
     sha: str 
-    cached: bool
+    cached: bool = False
 
 class RepoOverview(CamelModel):
     type: Literal["overview"] = "overview"
@@ -43,7 +43,7 @@ class TourRequest(CamelModel):
     request_url: str
 
 TourEvent = Annotated[
-    RepoMeta | RepoOverview | TourStopEvent | TourDoneEvent | TourErrorEvent,
+    FileMeta | RepoOverview | TourStopEvent | TourDoneEvent | TourErrorEvent,
     Field(discriminator = "type")
 ]
 tour_event_adapter = TypeAdapter(TourEvent)

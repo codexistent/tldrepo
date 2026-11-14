@@ -79,5 +79,22 @@ async def debug_ss(url: str, request: Request):
     return files
 
 @app.post("/api/tours")
-async def create_tour(body: TourRequest):
-    return StreamingResponse(fake_tour_events(), media_type="application/x-ndjson")
+async def create_tour(body: TourRequest, request: Request):
+    """ handles pre-streaming work """
+
+    start_time = time.perf_counter()
+
+    try:
+        owner, repo = parse_repo_url(body.request_url)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error))
+    snapshot = await get_snapshot(request.app.state.github, owner, repo)
+
+    picked_files = pick_key_files(snapshot.files)
+    files = await fetch_files(request.app.state.github, snapshot, picked_files)
+    if(len(files) == 0):
+        raise HTTPException(status_code=400, detail="No readable source files in repo")
+    
+    elapsed_time = round((time.perf_counter() - start_time)*1000)
+    
+    return StreamingResponse(fake_tour_events(snapshot, files, elapsed_time), media_type="application/x-ndjson")
