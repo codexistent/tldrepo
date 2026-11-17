@@ -10,7 +10,7 @@ import asyncio
 import json
 import logging
 
-from schemas import CamelModel, FileMeta, TourDoneEvent, TourStopEvent, RepoOverview, tour_event_adapter
+from schemas import CamelModel, FileMeta, TourDoneEvent, TourStopEvent, TourErrorEvent, RepoOverview, tour_event_adapter
 from collections.abc import AsyncGenerator
 
 from pydantic import ValidationError
@@ -48,6 +48,8 @@ def to_ndjson_line(event: CamelModel) -> str:
     return event.model_dump_json(by_alias=True) + "\n"
 
 def split_lines(text: str):
+    if "\n" not in text:
+        return [], text 
     return (text.rsplit("\n", 1)[0]).split("\n"), text.rsplit("\n", 1)[-1]
 
 def process_line(line: str, line_counts, state):
@@ -186,7 +188,11 @@ async def tour_events(snapshot: Snapshot, files: list[FileContent], start_time: 
         # return done
         yield to_ndjson_line(TourDoneEvent(stop_count=state["stop_count"],ms=round((time.perf_counter() - start_time)*1000)))
     except Exception as error:
-        logging.warning("A Gemini Error occured: %s", error)
+        # alert frontend
+        logging.exception("A Gemini Error occured: %s", error)
+
+        # alert backend
+        yield TourErrorEvent(error)
 
 def format_tree(files: list[RepoFile]) -> str:
     """All repo paths (capped for large repos), one per line"""
