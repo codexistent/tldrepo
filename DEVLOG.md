@@ -171,3 +171,13 @@ Since we only ever send one prompt to Gemini per repo, building the prompt we se
 The function `build_prompt` builds the prompt in `tour.py`. It builds off of `format_tree` and `format_file`, which build out the string listing all the paths of a repo and a file of a repo (with numbered lines) respectively. Then `build_prompt` pieces together the full string; for this function's main string (the list `sections` which then gets strung together), we used AI to help refine our prompt.
 
 We added a debugging route `/debug/bp` to test that the prompt building was working.
+
+# 11/17/2026
+
+Whale there was the AMCs but now we're back to building.
+
+## Streaming - backend (contd.)
+
+### Raw gemini streaming
+
+Created an async streaming client object for `create_tour`.

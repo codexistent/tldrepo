@@ -5,12 +5,16 @@
         - WHEN its ready
 """
 
+import time
 import asyncio
 
 from schemas import CamelModel, FileMeta, TourDoneEvent, TourStopEvent, RepoOverview
 from collections.abc import AsyncGenerator
 
-from github import Snapshot, FileContent, RepoFile
+from github import Snapshot, FileContent, RepoFile, is_junk
+
+from google import genai
+from google.genai import types
 
 # constants for building gemini prompt
 MAX_TREE_PATHS = 300
@@ -28,22 +32,19 @@ EXAMPLE_STOP = TourStopEvent(
     explanation="Creates the FastAPI app, registers the upload and thumbnail routes, and loads settings from environment variables.",
     why_it_matters="Every other file is reached from here."
 ).model_dump_json(by_alias=True)
+MODEL="gemini-3.1-flash-lite"
+GEMINI_CONFIG = {
+    "temperature" : 0.3, # lower means more consistent formatting 
+    "max_output_tokens": 3000,
+    "thinking_level" : "low"
+}
 
 def to_ndjson_line(event: CamelModel) -> str:
     # serialize one event as a single NDJSON line
     return event.model_dump_json(by_alias=True) + "\n"
 
 # creates, then streams/yields events as they come in
-async def tour_events(snapshot: Snapshot, files: list[FileContent], elapsed_time: int) -> AsyncGenerator[str, None]:
-    events: list[CamelModel] = [
-        FileMeta(
-            owner=snapshot.owner,
-            repo=snapshot.repo,
-            sha=snapshot.sha
-        ),
-        TourDoneEvent(stop_count=2, ms=elapsed_time),
-    ]
-
+async def tour_events(snapshot: Snapshot, files: list[FileContent], start_time: float, client: genai.Client) -> AsyncGenerator[str, None]:
     # # fake events for testing
     # events: list[CamelModel] = [
     #     FileMeta(owner="pallets", repo="flask", sha="fake-sha", cached=False),
@@ -73,9 +74,34 @@ async def tour_events(snapshot: Snapshot, files: list[FileContent], elapsed_time
     #     TourDoneEvent(stop_count=2, ms=2000),
     # ]
 
-    for event in events:
-        await asyncio.sleep(0.5)
-        yield to_ndjson_line(event)
+    yield to_ndjson_line(FileMeta(
+        owner=snapshot.owner,
+        repo=snapshot.repo,
+        sha=snapshot.sha
+    ))
+
+    # build prompt
+    
+    prompt = build_prompt(snapshot=snapshot, files=files)
+
+    start_time_2 = time.perf_counter()
+
+    # use ai
+    stream = await client.interactions.create(
+        generation_config=GEMINI_CONFIG,
+        model=MODEL,
+        input=prompt,
+        stream=True
+    )
+
+    async for event in stream:
+        if event.event_type == "step.delta":
+            if event.delta.type == "text":
+                print((time.perf_counter()-start_time_2)*1000, repr(event.delta.text), flush=True)
+
+    # return done
+    yield to_ndjson_line(TourDoneEvent(stop_count=2,ms=round((time.perf_counter() - start_time)*1000)))
+
 
 def format_tree(files: list[RepoFile]) -> str:
     """All repo paths (capped for large repos), one per line"""
@@ -104,12 +130,14 @@ def build_prompt(snapshot: Snapshot, files: list[FileContent]) -> str:
 
     readable = [file for file in files if file.lines] # non-empty files only
 
+    tree_files = [file for file in snapshot.files if not is_junk(file.path)] 
+
     sections = [
         "You are a senior engineer giving a new teammate a guided tour of a GitHub repository.",
         f"Repository: {snapshot.owner}/{snapshot.repo} (commit {snapshot.sha[:7]})",
         "",
         "## All file paths in the repository",
-        format_tree(snapshot.files),
+        format_tree(tree_files),
         "",
         "## Selected files",
         "Each line starts with its line number and a '|' character; the number is not part of the code.",

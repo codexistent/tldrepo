@@ -16,6 +16,9 @@ from tour import tour_events, build_prompt
 
 from dotenv import load_dotenv
 
+from google import genai
+from google.genai import types
+
 load_dotenv()
 
 @asynccontextmanager
@@ -24,10 +27,14 @@ async def lifespan(app: FastAPI):
 
     if(os.getenv("GITHUB_TOKEN") is None):
         raise RuntimeError("GITHUB_TOKEN not set.")
+    if(os.getenv("GEMINI_TOKEN") is None):
+        raise RuntimeError("GEMINI_TOKEN not set.")
 
-    token = os.getenv("GITHUB_TOKEN")
+    gh_token = os.getenv("GITHUB_TOKEN")
+    ai_token = os.getenv("GEMINI_TOKEN")
 
-    app.state.github = httpx.AsyncClient(base_url="https://api.github.com", headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"}, timeout=10)
+    app.state.github = httpx.AsyncClient(base_url="https://api.github.com", headers = {"Authorization": f"Bearer {gh_token}", "Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"}, timeout=10)
+    app.state.gemini = genai.Client(api_key=ai_token).aio
 
     yield 
     # runs once at shutdown
@@ -74,9 +81,7 @@ async def create_tour(body: TourRequest, request: Request):
     if(len(files) == 0):
         raise HTTPException(status_code=400, detail="No readable source files in repo")
     
-    elapsed_time = round((time.perf_counter() - start_time)*1000)
-    
-    return StreamingResponse(tour_events(snapshot, files, elapsed_time), media_type="application/x-ndjson")
+    return StreamingResponse(tour_events(snapshot, files, start_time, request.app.state.gemini), media_type="application/x-ndjson")
 
 # DEBUG ROUTES
 
