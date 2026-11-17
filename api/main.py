@@ -34,7 +34,7 @@ async def lifespan(app: FastAPI):
     ai_token = os.getenv("GEMINI_TOKEN")
 
     app.state.github = httpx.AsyncClient(base_url="https://api.github.com", headers = {"Authorization": f"Bearer {gh_token}", "Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"}, timeout=10)
-    app.state.gemini = genai.Client(api_key=ai_token).aio
+    app.state.gemini = genai.Client(api_key=ai_token)
 
     yield 
     # runs once at shutdown
