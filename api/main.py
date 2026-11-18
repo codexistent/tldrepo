@@ -1,5 +1,6 @@
 import os
 import time
+import logging
 
 import httpx
 from contextlib import asynccontextmanager
@@ -18,6 +19,10 @@ from dotenv import load_dotenv
 
 from google import genai
 from google.genai import types
+
+logging.basicConfig(
+    level = logging.INFO
+)
 
 load_dotenv()
 
@@ -85,45 +90,45 @@ async def create_tour(body: TourRequest, request: Request):
 
 # DEBUG ROUTES
 
-@app.get("/api/debug/ss")
-async def debug_ss(url: str, request: Request):
-    start_time = time.perf_counter() # testing
+# @app.get("/api/debug/ss")
+# async def debug_ss(url: str, request: Request):
+#     start_time = time.perf_counter() # testing
 
-    try:
-        owner, repo = parse_repo_url(url)
-    except ValueError as error:
-        raise HTTPException(status_code=400, detail=str(error))
+#     try:
+#         owner, repo = parse_repo_url(url)
+#     except ValueError as error:
+#         raise HTTPException(status_code=400, detail=str(error))
 
-    snapshot = await get_snapshot(request.app.state.github, owner, repo)
+#     snapshot = await get_snapshot(request.app.state.github, owner, repo)
 
-    picked_files = pick_key_files(snapshot.files)
+#     picked_files = pick_key_files(snapshot.files)
 
-    files = await fetch_files(request.app.state.github, snapshot, picked_files)
+#     files = await fetch_files(request.app.state.github, snapshot, picked_files)
 
-    elapsed_time = time.perf_counter() - start_time # testing
-    print("SUCCESSFULLY FETCHED FILES.") # testing
-    print("TIME TAKEN TO FETCH ALL FILES: ", elapsed_time) # testing
+#     elapsed_time = time.perf_counter() - start_time # testing
+#     print("SUCCESSFULLY FETCHED FILES.") # testing
+#     print("TIME TAKEN TO FETCH ALL FILES: ", elapsed_time) # testing
 
-    return files
+#     return files
 
 # test building prompt
-@app.get("/api/debug/bp")
-async def debug_build_prompt(url: str, request: Request):
-    start_time = time.perf_counter()
+# @app.get("/api/debug/bp")
+# async def debug_build_prompt(url: str, request: Request):
+#     start_time = time.perf_counter()
 
-    try:
-        owner, repo = parse_repo_url(url)
-    except ValueError as error:
-        raise HTTPException(status_code=400, detail=str(error))
+#     try:
+#         owner, repo = parse_repo_url(url)
+#     except ValueError as error:
+#         raise HTTPException(status_code=400, detail=str(error))
 
-    snapshot = await get_snapshot(request.app.state.github, owner, repo)
+#     snapshot = await get_snapshot(request.app.state.github, owner, repo)
 
-    picked_files = pick_key_files(snapshot.files)
+#     picked_files = pick_key_files(snapshot.files)
 
-    files = await fetch_files(request.app.state.github, snapshot, picked_files)
+#     files = await fetch_files(request.app.state.github, snapshot, picked_files)
 
-    prompt = build_prompt(snapshot=snapshot, files=files)
+#     prompt = build_prompt(snapshot=snapshot, files=files)
 
-    print("LEN OF PROMPT:", len(prompt))
-    print("PROMPT: ", prompt[:2000])
-    return
+#     print("LEN OF PROMPT:", len(prompt))
+#     print("PROMPT: ", prompt[:2000])
+#     return
