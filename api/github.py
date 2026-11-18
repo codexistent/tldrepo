@@ -11,10 +11,6 @@ from dataclasses import dataclass
 
 from urllib.parse import quote
 
-logging.basicConfig(
-    level = logging.DEBUG
-)
-
 # DATACLASSES
 #
 
@@ -54,7 +50,7 @@ MAX_SIZE = 100_000
 
 # constants used in to_lines 
 MAX_LINES = 250 
-MAX_CHARS = 12_000 
+MAX_CHARS = 6_000 
 MAX_LINE_LEN = 1_000
 
 # HELPERS
@@ -112,6 +108,16 @@ def score_file(parts: list[str], name: str, stem: str, suffix: str, depth: int) 
 
     return score
 
+def is_junk(path) -> bool:
+    path = path.lower()
+    parts = [path for path in path.split("/") if path != ""]
+
+    for skip in SKIP_DIRS:
+        if(any(part == skip for part in parts[:-1])):
+            return True 
+
+    return False
+
 # determine if file should be considered for tour; returns None if not wanted and a score otherwise (greater score = greater importance)
 def is_candidate(path, size) -> int | None:
     path = path.lower()
@@ -126,9 +132,8 @@ def is_candidate(path, size) -> int | None:
     if(size <= 0 or size > MAX_SIZE):
         return None
 
-    for skip in SKIP_DIRS:
-        if(any(part == skip for part in parts[:-1])):
-            return None
+    if(is_junk(path)):
+        return None
     
     if(any(parts[-1] == lockfile for lockfile in LOCKFILES)):
         return None
@@ -181,7 +186,12 @@ async def fetch_file(client: httpx.AsyncClient, semaphore: Semaphore, owner: str
         if '\x00' in response.text:
             return None
 
-        return FileContent(path, to_lines(response.text))
+        lines = to_lines(response.text)
+
+        if(lines == None):
+            return None
+
+        return FileContent(path, lines)
 
 # FUNCTIONS
 #

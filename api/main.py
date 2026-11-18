@@ -1,15 +1,28 @@
 import os
 import time
+import logging
 
 import httpx
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 
 from github import parse_repo_url, get_snapshot, pick_key_files, fetch_files
 
+from schemas import TourRequest
+
+from tour import tour_events, build_prompt
+
 from dotenv import load_dotenv
+
+from google import genai
+from google.genai import types
+
+logging.basicConfig(
+    level = logging.INFO
+)
 
 load_dotenv()
 
@@ -19,10 +32,14 @@ async def lifespan(app: FastAPI):
 
     if(os.getenv("GITHUB_TOKEN") is None):
         raise RuntimeError("GITHUB_TOKEN not set.")
+    if(os.getenv("GEMINI_TOKEN") is None):
+        raise RuntimeError("GEMINI_TOKEN not set.")
 
-    token = os.getenv("GITHUB_TOKEN")
+    gh_token = os.getenv("GITHUB_TOKEN")
+    ai_token = os.getenv("GEMINI_TOKEN")
 
-    app.state.github = httpx.AsyncClient(base_url="https://api.github.com", headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"}, timeout=10)
+    app.state.github = httpx.AsyncClient(base_url="https://api.github.com", headers = {"Authorization": f"Bearer {gh_token}", "Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"}, timeout=10)
+    app.state.gemini = genai.Client(api_key=ai_token)
 
     yield 
     # runs once at shutdown
@@ -52,23 +69,66 @@ app.add_middleware(
 def health():
     return {"status": "true"}
 
-@app.get("/api/debug/ss")
-async def debug_ss(url: str, request: Request):
-    start_time = time.perf_counter() # testing
+@app.post("/api/tours")
+async def create_tour(body: TourRequest, request: Request):
+    """ handles pre-streaming work """
+
+    start_time = time.perf_counter()
 
     try:
-        owner, repo = parse_repo_url(url)
+        owner, repo = parse_repo_url(body.request_url)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error))
-
     snapshot = await get_snapshot(request.app.state.github, owner, repo)
 
     picked_files = pick_key_files(snapshot.files)
-
     files = await fetch_files(request.app.state.github, snapshot, picked_files)
+    if(len(files) == 0):
+        raise HTTPException(status_code=400, detail="No readable source files in repo")
+    
+    return StreamingResponse(tour_events(snapshot, files, start_time, request.app.state.gemini), media_type="application/x-ndjson")
 
-    elapsed_time = time.perf_counter() - start_time # testing
-    print("SUCCESSFULLY FETCHED FILES.") # testing
-    print("TIME TAKEN TO FETCH ALL FILES: ", elapsed_time) # testing
+# DEBUG ROUTES
 
-    return files
+# @app.get("/api/debug/ss")
+# async def debug_ss(url: str, request: Request):
+#     start_time = time.perf_counter() # testing
+
+#     try:
+#         owner, repo = parse_repo_url(url)
+#     except ValueError as error:
+#         raise HTTPException(status_code=400, detail=str(error))
+
+#     snapshot = await get_snapshot(request.app.state.github, owner, repo)
+
+#     picked_files = pick_key_files(snapshot.files)
+
+#     files = await fetch_files(request.app.state.github, snapshot, picked_files)
+
+#     elapsed_time = time.perf_counter() - start_time # testing
+#     print("SUCCESSFULLY FETCHED FILES.") # testing
+#     print("TIME TAKEN TO FETCH ALL FILES: ", elapsed_time) # testing
+
+#     return files
+
+# test building prompt
+# @app.get("/api/debug/bp")
+# async def debug_build_prompt(url: str, request: Request):
+#     start_time = time.perf_counter()
+
+#     try:
+#         owner, repo = parse_repo_url(url)
+#     except ValueError as error:
+#         raise HTTPException(status_code=400, detail=str(error))
+
+#     snapshot = await get_snapshot(request.app.state.github, owner, repo)
+
+#     picked_files = pick_key_files(snapshot.files)
+
+#     files = await fetch_files(request.app.state.github, snapshot, picked_files)
+
+#     prompt = build_prompt(snapshot=snapshot, files=files)
+
+#     print("LEN OF PROMPT:", len(prompt))
+#     print("PROMPT: ", prompt[:2000])
+#     return

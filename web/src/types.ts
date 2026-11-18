@@ -3,7 +3,7 @@
  */
 
 // metadata on repo
-export type RepoMeta = {
+export type FileMeta = {
   type: "meta";
   owner: string;
   repo: string;
@@ -44,7 +44,7 @@ export type TourErrorEvent = {
 };
 
 export type TourEvent =
-  | RepoMeta
+  | FileMeta
   | RepoOverview
   | TourStopEvent
   | TourDoneEvent
