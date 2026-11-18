@@ -190,7 +190,7 @@ async def tour_events(snapshot: Snapshot, files: list[FileContent], start_time: 
         logging.exception("A Gemini Error occured: %s", error)
 
         # alert backend
-        yield TourErrorEvent(message=to_ndjson_line("A Gemini error occurred."))
+        yield to_ndjson_line(TourErrorEvent(message="A Gemini error occurred."))
 
 def format_tree(files: list[RepoFile]) -> str:
     """All repo paths (capped for large repos), one per line"""
