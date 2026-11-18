@@ -143,13 +143,13 @@ async def tour_events(snapshot: Snapshot, files: list[FileContent], start_time: 
         sha=snapshot.sha
     ))
 
-    # build prompt
-    
-    prompt = build_prompt(snapshot=snapshot, files=files)
-
-    ai_start = time.perf_counter()
-
     try:
+        # build prompt
+            
+        prompt = build_prompt(snapshot=snapshot, files=files)
+    
+        ai_start = time.perf_counter()
+    
         # plug in prompt to ai & get stream
         stream = await client.aio.interactions.create(
             generation_config=GEMINI_CONFIG,

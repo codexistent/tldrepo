@@ -11,10 +11,6 @@ from dataclasses import dataclass
 
 from urllib.parse import quote
 
-logging.basicConfig(
-    level = logging.DEBUG
-)
-
 # DATACLASSES
 #
 
@@ -54,7 +50,7 @@ MAX_SIZE = 100_000
 
 # constants used in to_lines 
 MAX_LINES = 250 
-MAX_CHARS = 12_000 
+MAX_CHARS = 6_000 
 MAX_LINE_LEN = 1_000
 
 # HELPERS
