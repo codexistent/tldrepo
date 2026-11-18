@@ -1,10 +1,10 @@
 import { useState, type ChangeEvent } from "react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
-import { parseRepo } from "../lib/utils";
+import { parseRepo } from "../lib/parseRepo";
 // import { useNavigate } from "react-router";
 
-export default function Home() {
+export default function HomePage() {
   const [value, setValue] = useState<string>("");
 
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -16,6 +16,8 @@ export default function Home() {
     if (result != null) {
       console.log(result.owner);
       console.log(result.repo);
+    } else {
+      console.log("Invalid repo link.");
     }
   };
 
