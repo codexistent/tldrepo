@@ -179,11 +179,9 @@ async def tour_events(snapshot: Snapshot, files: list[FileContent], start_time: 
                             if(processed_line != None):
                                 yield to_ndjson_line(processed_line)
 
-        lines, buffer = split_lines(buffer)
-        for line in lines:
-            processed_line = process_line(line, line_counts, state)
-            if(processed_line != None):
-                yield to_ndjson_line(processed_line)
+        processed_line = process_line(buffer, line_counts, state)
+        if(processed_line != None):
+            yield to_ndjson_line(processed_line)
 
         # return done
         yield to_ndjson_line(TourDoneEvent(stop_count=state["stop_count"],ms=round((time.perf_counter() - start_time)*1000)))
@@ -192,7 +190,7 @@ async def tour_events(snapshot: Snapshot, files: list[FileContent], start_time: 
         logging.exception("A Gemini Error occured: %s", error)
 
         # alert backend
-        yield TourErrorEvent(error)
+        yield TourErrorEvent(message=to_ndjson_line("A Gemini error occurred."))
 
 def format_tree(files: list[RepoFile]) -> str:
     """All repo paths (capped for large repos), one per line"""
